@@ -15,33 +15,33 @@ from PIL import Image
 class Motion:
 
 	def __init__( self ):
-		self.width = 1024						# Video file horizontal resolution
-		self.height = 768						# Video file vertical resolution
-		self.framerate = 15						# Video file framerate. For "realtime" playback, set to 30.
-		self.minimumLength = 5.0				# Minimum duration of a recording after motion stops. Lower number results in more files, higher number results in fewer, longer files.
-		self.rotation = 0						# Rotates image (warning: cropping will occur!)
-		self.filepath = "/home/"				# Local file path for video files
-		self.prefix = ""						# Optional filename prefix
-		self.testInterval = 0.5					# Interval at which stills are captured to test for motion
-		self.tWidth = 96						# motion testing horizontal resolution. Use low values!
-		self.tHeight = 72						# motion testing vertical resolution. Use low values!
-		self.threshold = 15						# How much a pixel value has to change to consider it "motion"
-		self.sensitivity = 25					# How many pixels have to change to trigger motion detection
+		self.width = 1024				# Video file horizontal resolution
+		self.height = 768				# Video file vertical resolution
+		self.framerate = 15				# Video file framerate. For "realtime" playback, set to 30.
+		self.minimumLength = 5.				# Minimum duration of a recording after motion stops. Lower number results in more files, higher number results in fewer, longer files.
+		self.rotation = 0				# Rotates image (warning: cropping will occur!)
+		self.filepath = "/home/"			# Local file path for video files
+		self.prefix = ""				# Optional filename prefix
+		self.testInterval = 0.5				# Interval at which stills are captured to test for motion
+		self.tWidth = 96				# motion testing horizontal resolution. Use low values!
+		self.tHeight = 72				# motion testing vertical resolution. Use low values!
+		self.threshold = 15				# How much a pixel value has to change to consider it "motion"
+		self.sensitivity = 25				# How many pixels have to change to trigger motion detection
 
 		self.camera = picamera.PiCamera()		# The camera object
 		self.timeWithoutActivity = 0.0			# How long since last motion detection
-		self.lastActiveTime = 0.0				# The time at which the last motion detection occurred
-		self.isRecording = False				# Is the camera currently recording? Prevents stopping a camera that is not recording.
-		self.skip = True						# Skips the first frame, to prevent a false positive motion detection (since the first image1 is black)
+		self.lastActiveTime = 0.0			# The time at which the last motion detection occurred
+		self.isRecording = False			# Is the camera currently recording? Prevents stopping a camera that is not recording.
+		self.skip = True				# Skips the first frame, to prevent a false positive motion detection (since the first image1 is black)
 
-		self.camera.resolution = ( 2592, 1944 )	# Records always at max resolution, scales down before saving to reduce noise.
-		self.camera.framerate = self.framerate	# Sets camera framerate
-		self.camera.rotation = self.rotation	# Sets camera rotation
+		self.camera.resolution = ( 2592, 1944 )		# Records always at max resolution, scales down before saving to reduce noise.
+		self.camera.framerate = self.framerate		# Sets camera framerate
+		self.camera.rotation = self.rotation		# Sets camera rotation
 	
 		self.image1 = Image.new( 'RGB', (self.tWidth, self.tHeight) )	# initializes image1
 		self.image2 = Image.new( 'RGB', (self.tWidth, self.tHeight) )	# initializes image2
-		self.buffer1 = self.image1.load()								# initializes image1 "raw data" buffer
-		self.buffer2 = self.image2.load()								# initializes image2 "raw data" buffer
+		self.buffer1 = self.image1.load()				# initializes image1 "raw data" buffer
+		self.buffer2 = self.image2.load()				# initializes image2 "raw data" buffer
 																		# The difference here is that image1 is handled like a file stream, while the buffer is the actual RGB byte data, if I understand it correctly!
 	
 	def StartRecording( self ):
