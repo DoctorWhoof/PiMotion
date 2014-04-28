@@ -1,5 +1,5 @@
 # Version 0.1, 2014-04-26
-# Script created by Leo Santos
+# Script created by Leo Santos ( http://www.leosantos.com )
 # Based on the picam.py script (by brainflakes, pageauc, peewee2 and Kesthal) and picamera examples.
 # Dependencies: PIL and picamera. Run "sudo apt-get install python-imaging-tk" and "sudo apt-get install python-picamera" to get those.
 
