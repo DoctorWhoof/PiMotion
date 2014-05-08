@@ -23,7 +23,7 @@ class Motion:
 		self.framerate = 15			# Video file framerate.
 		self.minimumLength = 10			# Minimum duration of a recording after motion stops. Lower number results in more files, higher number results in fewer, longer files.
 		self.rotation = 0			# Rotates image (warning: cropping will occur!)
-		self.filepath = "/home/leo/camera/"	# Local file path for video files
+		self.filepath = "/home/"		# Local file path for video files
 		self.prefix = ""			# Optional filename prefix
 		self.testInterval = 0.5			# Interval at which stills are captured to test for motion
 		self.tWidth = 96			# motion testing horizontal resolution. Use low values!
