@@ -3,7 +3,7 @@ PiMotion
 
 Pure python motion detection and high quality video recording for the Raspberry Pi Camera Module.
 
-The method used is to capture the video at max resolution (2592 x 1944) then scale it down to final resolution using the GPU to achieve a cleaner image quality thanks to oversampling.
+The method used is to capture the video at a high resolution (1920 x 1440 x 15fps by default) then scale it down to final resolution using the GPU to achieve a cleaner image quality thanks to oversampling.
 
 Yes, the Pi can handle it just fine, though it may choke a bit sometimes when doing the motion detection while recording the video. The "Stop recording" method may take a bit too long to kick in, but nothing too bad.
 
