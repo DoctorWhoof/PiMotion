@@ -1,4 +1,4 @@
-# Version 0.2, 2014-04-26
+# Version 0.21, 2014-05-11
 # Script created by Leo Santos ( http://www.leosantos.com )
 # Based on the picam.py script (by brainflakes, pageauc, peewee2 and Kesthal) and picamera examples.
 # Dependencies: PIL and picamera. Run "sudo apt-get install python-imaging-tk" and "sudo apt-get install python-picamera" to get those.
@@ -17,44 +17,60 @@ from PIL import Image
 class Motion:
 
 	def __init__( self ):
-							# For best results (by far) set width and height to exactly half camera.resolution. Anything else may result in cropping and noisy images.
-		self.width = 960			# Video file horizontal resolution
-		self.height = 720			# Video file vertical resolution
+
+		self.captureWidth = 1920		# Set this to a high resolution. The video file will be scaled down using "width" and "height" to reduce noise.
+		self.captureHeight = 1440		# Setting these to more than 1920x1440 seems to cause slowdown (records at a lower framerate)
+							# To achieve 30 fps, set this to 1920x1080 or less (cropping will occur)
+							
+		self.bitrate = 0			# default is 17000000
+		self.quantization = 20			# 10 is very high quality, 40 is very low. Use bitrate = 0 if quantization is non-zero.
+		
+		self.timerStart = 0			# only allows recording after this hour
+		self.timerStop = 24			# only allows recording before this hour
+							
+		self.videoReduction = 2			# For best results set this to 2. A video recorded at 1920x1440 will be scaled by half and saved at 960x720, reducing noise.
+		self.nightVideoReduction = 2		# scaling for nightMode.
+		self.allowNightMode = False		# If True, light sensitivity is increased at the expense of image quality
+		self.minimumTail = 10.0			# how long to keep testing for motion after last activity before commiting file
+
 		self.framerate = 15			# Video file framerate.
-		self.minimumLength = 10			# Minimum duration of a recording after motion stops. Lower number results in more files, higher number results in fewer, longer files.
 		self.rotation = 0			# Rotates image (warning: cropping will occur!)
 		self.filepath = "/home/"		# Local file path for video files
 		self.prefix = ""			# Optional filename prefix
-		self.testInterval = 0.5			# Interval at which stills are captured to test for motion
-		self.tWidth = 96			# motion testing horizontal resolution. Use low values!
-		self.tHeight = 72			# motion testing vertical resolution. Use low values!
-		self.threshold = 15			# How much a pixel value has to change to consider it "motion"
-		self.sensitivity = 25			# How many pixels have to change to trigger motion detection
-		
 		self.convertToMp4 = False		# Requires GPAC to be installed. Removes original .h264 file
 		self.useDateAsFolders = True		# Creates folders with current year, month and day, then saves file in the day folder.
-
+		self.usePreviewWindow = False		# Whether the preview window will be opened when running inside X.
+		
+		self.testInterval = 0.25		# Interval at which stills are captured to test for motion
+		self.testWidth = 96			# motion testing horizontal resolution. Use low values!
+		self.testHeight = 72			# motion testing vertical resolution. Use low values!
+		self.testStart = [ 0, 24 ]		# coordinates to start testing for motion
+		self.testEnd = [ 80, 71 ]		# coordinates to finish testing for motion
+		self.threshold = 20			# How much a pixel value has to change to consider it "motion"
+		self.sensitivity = 25			# How many pixels have to change to trigger motion detection
+							# Good day values with no wind: 20 and 25; with wind: at least 30 and 50; good night values: 15 and 20?
+		
 		self.camera = picamera.PiCamera()	# The camera object
 		self.timeWithoutActivity = 0.0		# How long since last motion detection
-		self.lastActiveTime = 0.0		# The time at which the last motion detection occurred
+		self.lastTimeWithoutActivity = datetime.now()	# How long since last frame without motion detected
+		self.lastStartedRecording = 0.0		# The time at which the last motion detection occurred
 		self.isRecording = False		# Is the camera currently recording? Prevents stopping a camera that is not recording.
 		self.skip = True			# Skips the first frame, to prevent a false positive motion detection (since the first image1 is black)
+		self.nightMode = False
 		self.filename = ""
 		self.mp4name = ""
 		self.folderPath = ""
+		self.image1 = Image.new( 'RGB', (self.testWidth, self.testHeight) )	# initializes image1
+		self.image2 = Image.new( 'RGB', (self.testWidth, self.testHeight) )	# initializes image2
+		self.buffer1 = self.image1.load()					# initializes image1 "raw data" buffer
+		self.buffer2 = self.image2.load()					# initializes image2 "raw data" buffer
+											# The difference here is that image1 is handled like a file stream, while the buffer is the actual RGB byte data, if I understand it correctly!
 
-		self.camera.resolution = ( 1920, 1440 )	# Set this to a high resolution, scale the video file down using "width" and "height" to reduce noise.
-							# Setting this to more than 1920x1440 seems to cause slowdown (records at a lower framerate)
-							# To achieve 30 fps, set this to 1920x1080 or less (cropping will occur)
-												
-		self.camera.framerate = self.framerate	# Sets camera framerate
-		self.camera.rotation = self.rotation	# Sets camera rotation
+		self.camera.resolution = ( self.captureWidth, self.captureHeight )
+		self.camera.framerate = self.framerate
+		self.camera.rotation = self.rotation
+		self.camera.meter_mode = "average"	# Values are: average, spot, matrix, backlit
 	
-		self.image1 = Image.new( 'RGB', (self.tWidth, self.tHeight) )	# initializes image1
-		self.image2 = Image.new( 'RGB', (self.tWidth, self.tHeight) )	# initializes image2
-		self.buffer1 = self.image1.load()				# initializes image1 "raw data" buffer
-		self.buffer2 = self.image2.load()				# initializes image2 "raw data" buffer
-																		# The difference here is that image1 is handled like a file stream, while the buffer is the actual RGB byte data, if I understand it correctly!
 	
 	def StartRecording( self ):
 		if not self.isRecording and not self.skip:
@@ -63,20 +79,41 @@ class Motion:
 			if self.useDateAsFolders:
 				self.folderPath = self.filepath +"%04d/%02d/%02d" % ( timenow.year, timenow.month, timenow.day )
 				subprocess.call( [ "mkdir", "-p", self.folderPath ] )
-				self.filename = self.folderPath + "/" + self.prefix + "%02d%02d%02d.h264" % ( timenow.hour, timenow.minute, timenow.second )
+				self.filename = self.folderPath + "/" + self.prefix + "%02d-%02d-%02d.h264" % ( timenow.hour, timenow.minute, timenow.second )
 			else:
 				self.filename = self.filepath + self.prefix + "%04d%02d%02d-%02d%02d%02d.h264" % ( timenow.year, timenow.month, timenow.day, timenow.hour, timenow.minute, timenow.second )
+			
+			if (( timenow.hour >= 20 ) or ( timenow.hour <= 5 )) and ( self.allowNightMode == True ):
+				self.camera.exposure_mode = "night"
+				self.camera.image_effect = "denoise"
+				self.camera.exposure_compensation = 25
+				self.camera.ISO = 800
+				self.camera.brightness = 70
+				self.camera.contrast = 50
+				self.width = int( self.captureWidth / self.nightVideoReduction )
+				self.height = int( self.captureHeight / self.nightVideoReduction )
+				self.nightMode = True
+			else:
+				self.camera.exposure_mode = "auto"
+				self.camera.image_effect = "none"
+				self.camera.exposure_compensation = 0
+				self.camera.ISO = 0
+				self.camera.brightness = 50
+				self.camera.contrast = 0
+				self.width = int( self.captureWidth / self.videoReduction )
+				self.height = int( self.captureHeight / self.videoReduction )
+				self.nightMode = False
 
 			self.mp4name = self.filename[:-4] + "mp4"
-			self.camera.start_recording( self.filename, resize=( self.width, self.height) )
+			self.camera.start_recording( self.filename, resize=( self.width, self.height), quantization = self.quantization, bitrate = self.bitrate )
 			self.isRecording = True
-			self.lastActiveTime = time.clock()
-			print "Started recording %s" % self.filename
+			print "Started recording %s" % self.filename + " with night mode = " + str( self.nightMode )
 
 	def StopRecording( self ):
-		if self.isRecording and ( self.timeWithoutActivity > self.minimumLength ):
+		if self.isRecording:
 			self.camera.stop_recording()
 			self.isRecording = False
+			motion.skip = True
 			if self.convertToMp4:
 				subprocess.call( [ "MP4Box","-fps",str(self.framerate),"-add",self.filename,self.mp4name ] )
 				subprocess.call( [ "rm", self.filename ] )
@@ -85,10 +122,11 @@ class Motion:
 				print "Finished recording."
 
 	def CaptureTestImage( self ):
+		self.camera.image_effect = "none"
 		self.image1 = self.image2
 		self.buffer1 = self.buffer2
 		imageData = cStringIO.StringIO()
-		self.camera.capture( imageData, 'bmp', use_video_port=True, resize=( self.tWidth, self.tHeight) )
+		self.camera.capture( imageData, 'bmp', use_video_port=True, resize=( self.testWidth, self.testHeight) )
 		imageData.seek(0)
 		im = Image.open( imageData )
 		buffer = im.load()
@@ -98,30 +136,36 @@ class Motion:
 	def TestMotion( self ):
 		changedPixels = 0
 		self.image2, self.buffer2 = self.CaptureTestImage()
-		for x in xrange( 0, self.tWidth-1 ):
-			for y in xrange( 0, self.tHeight-1 ):
+		for x in xrange( self.testStart[0], self.testEnd[0] ):
+			for y in xrange( self.testStart[1], self.testEnd[1] ):
 				pixdiff = abs( self.buffer1[x,y][1] - self.buffer2[x,y][1] )
 				if pixdiff > self.threshold:
 					changedPixels += 1
 		if changedPixels > self.sensitivity:
 			self.timeWithoutActivity = 0
+			self.lastTimeWithoutActivity = datetime.now()
 			return True
 		else:
-			self.timeWithoutActivity += ( time.clock() - self.lastActiveTime )
+			self.timeWithoutActivity += ( datetime.now() - self.lastTimeWithoutActivity ).total_seconds()
+			self.lastTimeWithoutActivity = datetime.now()
 			return False
 
 motion = Motion()
 print "Warming up camera..."
-time.sleep( 1 )
+time.sleep( 2 )
 print "Camera ready to record. Use Ctrl+C to stop."
 
 try:
 	while True:
-		motion.camera.start_preview()
-		if motion.TestMotion():
-			motion.StartRecording()
-		else:
-			motion.StopRecording()
+		timenow = datetime.now()
+		if ( timenow.hour >= motion.timerStart ) and ( timenow.hour <= motion.timerStop ):
+			if motion.usePreviewWindow:
+				motion.camera.start_preview()
+			if motion.TestMotion():
+				motion.StartRecording()
+			else:
+				if ( motion.timeWithoutActivity > motion.minimumTail ):
+					motion.StopRecording()
 		time.sleep( motion.testInterval )
 		motion.skip = False
 except KeyboardInterrupt:
