@@ -13,6 +13,7 @@ Requires installation of PIL and picamera modules:
 sudo apt-get install python-imaging-tk
 sudo apt-get install python-picamera
 
-I'm not a real programmer, so feel free to improve, simplify my code and let me know so I can use it as well! :-)
+I'm not a real programmer, so feel free to improve and simplify my code. Let me know so I can use it as well! :-)
+
 Cheers!
 Leo.
