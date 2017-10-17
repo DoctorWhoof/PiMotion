@@ -16,4 +16,3 @@ sudo apt-get install python-picamera
 I'm not a real programmer, so feel free to improve and simplify my code. Let me know so I can use it as well! :-)
 
 Cheers!
-Leo.
